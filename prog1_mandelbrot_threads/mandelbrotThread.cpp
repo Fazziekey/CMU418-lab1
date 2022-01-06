@@ -22,19 +22,31 @@ extern void mandelbrotSerial(
     int maxIterations,
     int output[]);
 
+extern void mandelbrotStepSerial(
+    float x0, float y0, float x1, float y1,
+    int width, int height,
+    int startRow, int step,
+    int maxIterations,
+    int output[]);
 
 //
 // workerThreadStart --
 //
 // Thread entrypoint.
 void* workerThreadStart(void* threadArgs) {
-
+    double startTime = CycleTimer::currentSeconds();
     WorkerArgs* args = static_cast<WorkerArgs*>(threadArgs);
+    // int startRow = ((args->height)/(args->numThreads)) * args->threadId;
+    // int totalRow = (args->height)/(args->numThreads);
+    // if(args->threadId + 1 == args->numThreads)
+    //     totalRow = args->height - startRow;
+    // mandelbrotSerial(args->x0, args->y0, args->x1, args->y1, args->width, args->height, startRow, totalRow, args->maxIterations, args->output);
+    //printf("thread %d\n, startrow: %d, endRow: %d", args->threadId, startRow, startRow + totalRow);
+    mandelbrotStepSerial(args->x0, args->y0, args->x1, args->y1,
+       args->width, args->height, args->threadId, args->numThreads, args->maxIterations, args->output);
 
-    // TODO: Implement worker thread here.
-
-    printf("Hello world from thread %d\n", args->threadId);
-
+    double endTime = CycleTimer::currentSeconds();
+    printf("[mandelbrot thread %d]:\t\t[%.3f] ms\n", args->threadId, (endTime - startTime) * 1000);
     return NULL;
 }
 
@@ -62,6 +74,15 @@ void mandelbrotThread(
 
     for (int i=0; i<numThreads; i++) {
         // TODO: Set thread arguments here.
+        args[i].x0 = x0;
+        args[i].x1 = x1;
+        args[i].y0 = y0;
+        args[i].y1 = y1;
+        args[i].width = width;
+        args[i].height = height;
+        args[i].output = output;
+        args[i].maxIterations = maxIterations;
+        args[i].numThreads = numThreads;
         args[i].threadId = i;
     }
 

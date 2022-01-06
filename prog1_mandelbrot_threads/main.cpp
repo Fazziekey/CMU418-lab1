@@ -111,8 +111,10 @@ int main(int argc, char** argv) {
             break;
         }
         case '?':
-        default:
             usage(argv[0]);
+            return 1;
+        default:
+            printf("invalid grgument!");
             return 1;
         }
     }
