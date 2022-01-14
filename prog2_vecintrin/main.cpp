@@ -91,13 +91,13 @@ int main(int argc, char * argv[]) {
       printf("Passed!!!\n");
     }
   } else {
-    printf("Must have N % VECTOR_WIDTH == 0 for this problem (VECTOR_WIDTH is %d)\n", VECTOR_WIDTH);
+    printf("Must have N %% VECTOR_WIDTH == 0 for this problem (VECTOR_WIDTH is %d)\n", VECTOR_WIDTH);
   }
 
   delete[] values;
   delete[] exponents;
   delete[] output;
-  delete gold;
+  delete[] gold;
 
   return 0;
 }
@@ -239,8 +239,51 @@ void clampedExpSerial(float* values, int* exponents, float* output, int N) {
 void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // TODO: Implement your vectorized version of clampedExpSerial here
 
-  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+  __cmu418_vec_float input;
+  __cmu418_vec_int exp;
+  __cmu418_vec_float result;
+  __cmu418_vec_int zero = _cmu418_vset_int(0);
+  __cmu418_vec_float overflow = _cmu418_vset_float(9.999999f);
+  __cmu418_mask maskAll;
+  __cmu418_mask maskExp;
 
+//  Note: Take a careful look at this loop indexing.  This example
+//  code is not guaranteed to work when (N % VECTOR_WIDTH) != 0.
+//  Why is that the case?
+  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+    // All ones
+    maskAll = _cmu418_init_ones();
+
+    // Load vector of values from contiguous memory addresses
+    _cmu418_vload_float(input, values+i, maskAll);               // input = values[i];
+
+    _cmu418_vload_int(exp, exponents+i, maskAll);               // exp = exponents[i]
+
+    _cmu418_veq_int(maskExp, exp, zero, maskAll);                // if exp == 0
+
+    _cmu418_vset_float(result, 1.f, maskExp);                    // input = 1
+  
+    maskExp = _cmu418_mask_not(maskExp);
+
+    _cmu418_vmove_float(result, input, maskExp);              //else result = input
+
+    int count = 1;
+
+    while(count <= EXP_MAX){
+      __cmu418_vec_int tmp = _cmu418_vset_int(count);
+      _cmu418_vgt_int(maskExp, exp, tmp, maskExp);
+      if(!_cmu418_cntbits(maskExp))
+        break;
+      _cmu418_vmult_float(result, result, input, maskExp);      //  result *= x; 
+      count++;
+    }
+
+    _cmu418_vgt_float(maskExp, result, overflow, maskAll);      // if result > 9.999999f
+    _cmu418_vset_float(result, 9.999999f,maskExp); 
+                 //    result = 9.999999f
+        
+    // Write results back to memory
+    _cmu418_vstore_float(output+i, result, maskAll);
   }
 
 }
@@ -258,11 +301,23 @@ float arraySumSerial(float* values, int N) {
 // Assume VECTOR_WIDTH is a power of 2
 float arraySumVector(float* values, int N) {
   // TODO: Implement your vectorized version of arraySumSerial here
+  __cmu418_vec_float input;
+  __cmu418_vec_float result = _cmu418_vset_float(0);
+  __cmu418_mask maskAll = _cmu418_init_ones();
+  float sum = 0;
 
   for (int i=0; i<N; i+=VECTOR_WIDTH) {
 
+    // Load vector of values from contiguous memory addresses
+    _cmu418_vload_float(input, values+i, maskAll);               // input = values[i]; 
+
+    _cmu418_vadd_float(result, result, input, maskAll);         //   result += input[i]
   }
 
-  return 0.0;
+  for(int i=0; i<VECTOR_WIDTH; i++){
+    sum += result.value[i];
+  }
+
+  return sum;
 }
 
